@@ -1,4 +1,4 @@
-name: Publicar demo web
+name: Publicar y probar demo web
 
 on:
   push:
@@ -21,10 +21,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-      - name: Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Instalar dependencias
@@ -35,10 +33,8 @@ jobs:
         env:
           VITE_DEMO_MODE: 'true'
         run: npm run build
-      - name: Configurar Pages
-        uses: actions/configure-pages@v5
-      - name: Subir artefacto
-        uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
         with:
           path: frontend/dist
 
@@ -52,3 +48,30 @@ jobs:
       - name: Publicar
         id: deployment
         uses: actions/deploy-pages@v4
+
+  playtest:
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependencias
+        working-directory: frontend
+        run: npm install
+      - name: Instalar navegador
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Esperar propagacion de Pages
+        run: sleep 15
+      - name: Jugar y verificar
+        working-directory: frontend
+        run: npm run test:e2e
+      - name: Guardar capturas visuales
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eternal-visual-playtest
+          path: frontend/e2e-artifacts
+          retention-days: 14
