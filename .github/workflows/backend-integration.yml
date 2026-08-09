@@ -1,0 +1,111 @@
+name: Backend integration
+
+on:
+  workflow_dispatch:
+
+jobs:
+  integration:
+    name: Probar reino y granja
+    runs-on: ubuntu-latest
+    environment: eternal-sql
+    env:
+      DB_SERVER: ${{ secrets.ETERNAL_DB_SERVER }}
+      DB_NAME: ${{ secrets.ETERNAL_DB_NAME }}
+      DB_USER: ${{ secrets.ETERNAL_DB_USER }}
+      DB_PASSWORD: ${{ secrets.ETERNAL_DB_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Instalar sqlcmd
+        run: |
+          curl https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
+          curl https://packages.microsoft.com/config/ubuntu/24.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18
+
+      - name: Restablecer demo
+        run: |
+          /opt/mssql-tools18/bin/sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASSWORD" -C -b -i sql/001_mvp_reino_recursos_granja.sql
+          /opt/mssql-tools18/bin/sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASSWORD" -C -b -i sql/002_ci_reset_demo.sql
+
+      - name: Compilar backend
+        working-directory: backend
+        run: mvn -B -DskipTests package
+
+      - name: Arrancar backend
+        working-directory: backend
+        env:
+          SPRING_PROFILES_ACTIVE: local
+          DB_URL: jdbc:sqlserver://${{ secrets.ETERNAL_DB_SERVER }}:1433;databaseName=${{ secrets.ETERNAL_DB_NAME }};encrypt=true;trustServerCertificate=true
+          DB_USER: ${{ secrets.ETERNAL_DB_USER }}
+          DB_PASSWORD: ${{ secrets.ETERNAL_DB_PASSWORD }}
+        run: |
+          java -jar target/*.jar > /tmp/eternal-backend.log 2>&1 &
+          echo $! > /tmp/eternal-backend.pid
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8080/api/health >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/eternal-backend.log
+          exit 1
+
+      - name: Comprobar estado inicial
+        run: |
+          curl --fail --silent http://127.0.0.1:8080/api/kingdom > /tmp/before.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/before.json'))
+          assert float(d['resources']['WOOD']) == 500.0, d
+          farm=next(b for b in d['buildings'] if b['code']=='FARM')
+          assert farm['level'] == 0, d
+          assert d['construction'] is None, d
+          print('Estado inicial OK')
+          PY
+
+      - name: Construir granja nivel 1
+        run: |
+          REQUEST_ID=$(python3 -c 'import uuid; print(uuid.uuid4())')
+          curl --fail --silent -X POST http://127.0.0.1:8080/api/kingdom/farm/upgrade \
+            -H 'Content-Type: application/json' \
+            -d "{\"requestId\":\"$REQUEST_ID\"}" > /tmp/upgrade.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/upgrade.json'))
+          assert float(d['resources']['WOOD']) == 400.0, d
+          assert d['construction'] is not None, d
+          assert d['construction']['fromLevel'] == 0, d
+          assert d['construction']['toLevel'] == 1, d
+          print('Inicio de construccion OK')
+          PY
+
+      - name: Esperar finalizacion y validar produccion
+        run: |
+          sleep 7
+          curl --fail --silent http://127.0.0.1:8080/api/kingdom > /tmp/after.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/after.json'))
+          farm=next(b for b in d['buildings'] if b['code']=='FARM')
+          assert farm['level'] == 1, d
+          assert d['construction'] is None, d
+          assert float(d['resources']['WOOD']) == 400.0, d
+          assert float(d['resources']['FOOD']) > 500.0, d
+          print('Finalizacion y produccion persistente OK')
+          PY
+
+      - name: Validar trazabilidad SQL
+        run: |
+          /opt/mssql-tools18/bin/sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASSWORD" -C -b -Q "SET NOCOUNT ON; DECLARE @K BIGINT=(SELECT k.Id FROM dbo.ec_kingdoms k JOIN dbo.ec_players p ON p.Id=k.PlayerId WHERE p.PlayerName=N'Comandante'); IF (SELECT COUNT(*) FROM dbo.ec_resource_transactions WHERE KingdomId=@K AND ResourceCode='WOOD' AND ReasonCode='BUILDING_UPGRADE' AND Amount=-100)<>1 THROW 51000,'Movimiento de madera incorrecto',1; IF NOT EXISTS(SELECT 1 FROM dbo.ec_resource_transactions WHERE KingdomId=@K AND ResourceCode='FOOD' AND ReasonCode='OFFLINE_PRODUCTION' AND Amount>0) THROW 51000,'Falta movimiento de produccion',1; SELECT 'BACKEND INTEGRATION OK' Result;"
+
+      - name: Mostrar log si falla
+        if: failure()
+        run: cat /tmp/eternal-backend.log || true
