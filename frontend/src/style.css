@@ -1,10 +1,24 @@
 * { box-sizing: border-box; }
+:root { color-scheme: dark; }
 html, body, #app { margin: 0; width: 100%; height: 100%; overflow: hidden; }
-body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #17140f; }
+body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #11170f; }
 #app { display: grid; grid-template-rows: auto 1fr auto; }
-#game { min-height: 0; }
+#game { min-height: 0; position: relative; }
 #game canvas { display: block; }
-.resource-bar { min-height: 52px; padding: max(8px, env(safe-area-inset-top)) 10px 8px; display: flex; align-items: center; justify-content: center; gap: clamp(8px, 3vw, 28px); flex-wrap: wrap; background: #2b2419; color: #fff5d7; font-weight: 700; box-shadow: 0 2px 10px #0008; z-index: 10; }
-.game-nav { min-height: 64px; padding: 7px 8px max(7px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; background: #2b2419; z-index: 10; }
-.game-nav button { border: 1px solid #9d7c43; border-radius: 10px; background: #493b27; color: #fff5d7; font: inherit; font-weight: 700; min-height: 48px; cursor: pointer; }
-@media (max-width: 560px) { .resource-bar { font-size: 13px; gap: 8px 14px; } .game-nav button { font-size: 12px; } }
+.topbar { min-height: 74px; padding: max(8px, env(safe-area-inset-top)) 16px 8px; display: flex; align-items: center; gap: 20px; background: linear-gradient(180deg,#29271f,#191a16); border-bottom: 1px solid #5f563c; box-shadow: 0 4px 18px #0009; z-index: 10; }
+.brand { min-width: 230px; display:flex; align-items:center; gap:10px; color:#f5df9d; text-shadow:0 2px 2px #000; }
+.brand-mark { width:42px; height:42px; border-radius:50%; display:grid; place-items:center; font-size:27px; background:linear-gradient(#8c7133,#4b3518); border:2px solid #c3a45b; box-shadow:inset 0 0 8px #0008; }
+.brand strong { display:block; font-family:Georgia,serif; font-size:16px; letter-spacing:1.2px; }
+.brand small { display:block; margin-top:2px; color:#c6c2ad; font-size:11px; }
+.resources { flex:1; display:flex; justify-content:flex-end; gap:clamp(7px,2vw,22px); }
+.resources > div { min-width:70px; display:grid; grid-template-columns:24px auto; grid-template-rows:auto auto; align-items:center; column-gap:5px; }
+.resources b { color:#fff8df; font-size:15px; line-height:17px; }
+.resources small { grid-column:2; color:#999d8d; font-size:9px; text-transform:uppercase; letter-spacing:.4px; }
+.resource-icon { grid-row:1/3; width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font-size:13px; color:#fff; text-shadow:0 1px 2px #000; box-shadow:inset 0 0 5px #0008,0 1px 2px #000; }
+.food{background:#b78832}.wood{background:#7a4c2b}.stone{background:#777d7b}.gold{background:#d19b2c}.gems{background:#4fabc1}
+.game-nav { min-height:72px; padding:7px 8px max(7px, env(safe-area-inset-bottom)); display:grid; grid-template-columns:repeat(4,1fr); gap:7px; background:linear-gradient(#181914,#25241c); border-top:1px solid #5d543a; box-shadow:0 -4px 18px #0008; z-index:10; }
+.game-nav button { border:1px solid #5f563c; border-radius:9px; background:linear-gradient(#3d3a2c,#29281f); color:#c8c6b8; font:inherit; font-size:12px; font-weight:700; min-height:54px; cursor:pointer; text-transform:uppercase; letter-spacing:.4px; }
+.game-nav button span { display:block; color:#d0af62; font-size:22px; line-height:24px; }
+.game-nav button.active { border-color:#b38d47; color:#fff0bf; background:linear-gradient(#5a4930,#342c20); box-shadow:inset 0 0 12px #d6a94a22; }
+@media (max-width:760px){.topbar{padding-left:8px;padding-right:8px;gap:7px}.brand{min-width:auto}.brand strong{font-size:12px}.brand small{display:none}.brand-mark{width:34px;height:34px;font-size:22px}.resources{gap:5px}.resources>div{min-width:43px;display:flex;gap:3px}.resources small{display:none}.resources b{font-size:12px}.resource-icon{width:18px;height:18px;font-size:9px}.game-nav{min-height:62px}.game-nav button{min-height:48px;font-size:9px}.game-nav button span{font-size:18px}}
+@media (max-width:470px){.brand strong{display:none}.brand-mark{width:31px;height:31px}.resources{justify-content:space-between}.resources>div{min-width:0}.resources b{font-size:11px}}
