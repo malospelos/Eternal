@@ -1,250 +1,50 @@
 import Phaser from 'phaser';
 import './style.css';
 
-type Building = {
-  id: string;
-  code: string;
-  name: string;
-  level: number;
-  productionPerHour: number;
-  positionX: number;
-  positionY: number;
-};
-
-type Construction = {
-  id: string;
-  buildingCode: string;
-  fromLevel: number;
-  toLevel: number;
-  startedAt: string;
-  finishAt: string;
-  remainingSeconds: number;
-};
-
-type KingdomState = {
-  kingdomId: string;
-  kingdomName: string;
-  kingdomLevel: number;
-  resources: Record<string, number>;
-  buildings: Building[];
-  construction: Construction | null;
-  serverTime: string;
-};
-
-const IS_DEMO = window.location.hostname.endsWith('github.io') || import.meta.env.VITE_DEMO_MODE === 'true';
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080').replace(/\/$/, '');
-const DEMO_KEY = 'eternal-crown-demo-state-v1';
-
-function createDemoState(): KingdomState {
-  return {
-    kingdomId: 'demo-kingdom',
-    kingdomName: 'Reino de Elyndor',
-    kingdomLevel: 1,
-    resources: { FOOD: 500, WOOD: 500, STONE: 500, GOLD: 500, GEMS: 100 },
-    buildings: [
-      { id: 'castle-demo', code: 'CASTLE', name: 'Castillo', level: 1, productionPerHour: 0, positionX: 0, positionY: 0 },
-      { id: 'farm-demo', code: 'FARM', name: 'Granja', level: 0, productionPerHour: 0, positionX: 1, positionY: 1 }
-    ],
-    construction: null,
-    serverTime: new Date().toISOString()
-  };
+type Building={id:string;code:string;name:string;level:number;productionPerHour:number;positionX:number;positionY:number};
+type Construction={id:string;buildingCode:string;fromLevel:number;toLevel:number;startedAt:string;finishAt:string;remainingSeconds:number};
+type KingdomState={kingdomId:string;kingdomName:string;kingdomLevel:number;resources:Record<string,number>;buildings:Building[];construction:Construction|null;serverTime:string};
+const IS_DEMO=window.location.hostname.endsWith('github.io')||import.meta.env.VITE_DEMO_MODE==='true';
+const API_BASE=(import.meta.env.VITE_API_BASE_URL??'http://localhost:8080').replace(/\/$/,'');
+const DEMO_KEY='eternal-crown-demo-state-v1';
+function createDemoState():KingdomState{return{kingdomId:'demo-kingdom',kingdomName:'Reino de Elyndor',kingdomLevel:1,resources:{FOOD:500,WOOD:500,STONE:500,GOLD:500,GEMS:100},buildings:[{id:'castle-demo',code:'CASTLE',name:'Castillo',level:1,productionPerHour:0,positionX:0,positionY:0},{id:'farm-demo',code:'FARM',name:'Granja',level:0,productionPerHour:0,positionX:1,positionY:1}],construction:null,serverTime:new Date().toISOString()}}
+function saveDemoState(s:KingdomState){localStorage.setItem(DEMO_KEY,JSON.stringify(s))}
+function loadDemoState():KingdomState{const raw=localStorage.getItem(DEMO_KEY);const s=raw?JSON.parse(raw) as KingdomState:createDemoState();const now=Date.now();if(s.construction){const finish=new Date(s.construction.finishAt).getTime();if(now>=finish){const farm=s.buildings.find(b=>b.code==='FARM');if(farm){farm.level=s.construction.toLevel;farm.productionPerHour=farm.level===1?600:Math.round(600*Math.pow(1.45,farm.level-1))}s.construction=null}else s.construction.remainingSeconds=Math.ceil((finish-now)/1000)}const last=new Date(s.serverTime).getTime();const farm=s.buildings.find(b=>b.code==='FARM');if(farm&&farm.level>0&&now>last)s.resources.FOOD=(s.resources.FOOD??0)+farm.productionPerHour*((now-last)/3600000);s.serverTime=new Date(now).toISOString();saveDemoState(s);return s}
+async function loadKingdom(){if(IS_DEMO)return loadDemoState();const r=await fetch(`${API_BASE}/api/kingdom`);if(!r.ok)throw new Error('No se pudo cargar el reino');return r.json() as Promise<KingdomState>}
+async function upgradeFarm(){if(IS_DEMO){const s=loadDemoState(),farm=s.buildings.find(b=>b.code==='FARM');if(!farm||s.construction)return s;const level=farm.level+1,cost=level===1?100:Math.round(100*Math.pow(1.7,level-1));if((s.resources.WOOD??0)<cost)throw new Error('No tienes madera suficiente');s.resources.WOOD-=cost;const seconds=level===1?5:Math.min(30,5*level),start=new Date(),finish=new Date(start.getTime()+seconds*1000);s.construction={id:crypto.randomUUID(),buildingCode:'FARM',fromLevel:farm.level,toLevel:level,startedAt:start.toISOString(),finishAt:finish.toISOString(),remainingSeconds:seconds};saveDemoState(s);return s}const r=await fetch(`${API_BASE}/api/kingdom/farm/upgrade`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requestId:crypto.randomUUID()})});if(!r.ok)throw new Error('No se pudo mejorar la granja');return r.json() as Promise<KingdomState>}
+class KingdomScene extends Phaser.Scene{
+ private state?:KingdomState;private status?:Phaser.GameObjects.Text;private farmButton?:Phaser.GameObjects.Container;
+ constructor(){super('KingdomScene')}
+ create(){this.cameras.main.setBackgroundColor('#5d793e');this.scale.on('resize',()=>this.renderScene());this.status=this.add.text(16,16,'Cargando...',{fontFamily:'system-ui',fontSize:'15px',color:'#fff',backgroundColor:'#000a',padding:{x:10,y:7}}).setDepth(50);void this.refresh();this.time.addEvent({delay:1000,loop:true,callback:()=>void this.refresh(false)})}
+ private async refresh(showError=true){try{this.state=await loadKingdom();this.status?.setText('');this.updateHud();this.renderScene()}catch(e){if(showError)this.status?.setText(e instanceof Error?e.message:'Error')}}
+ private updateHud(){if(!this.state)return;for(const [key,id] of Object.entries({FOOD:'res-food',WOOD:'res-wood',STONE:'res-stone',GOLD:'res-gold',GEMS:'res-gems'})){const el=document.getElementById(id);if(el)el.textContent=Math.floor(this.state.resources[key]??0).toLocaleString('es-ES')}}
+ private renderScene(){if(!this.state)return;const{width:w,height:h}=this.scale;const farm=this.state.buildings.find(b=>b.code==='FARM'),level=farm?.level??0,construction=this.state.construction;this.children.list.filter(c=>c!==this.status).forEach(c=>c.destroy());
+ const g=this.add.graphics();g.fillStyle(0x6f914d).fillRect(0,0,w,h);g.fillStyle(0x668846).fillEllipse(w*.5,h*.53,w*.95,h*.94);g.lineStyle(2,0x789c55,.35);for(let y=35;y<h;y+=48)g.lineBetween(0,y,w,y+70);
+ // river
+ g.fillStyle(0x3c7782,.9);g.beginPath();g.moveTo(w*.03,h);g.lineTo(w*.16,h*.72);g.lineTo(w*.12,h*.48);g.lineTo(w*.2,h*.25);g.lineTo(w*.17,0);g.lineTo(w*.28,0);g.lineTo(w*.3,h*.26);g.lineTo(w*.23,h*.5);g.lineTo(w*.28,h*.73);g.lineTo(w*.18,h);g.closePath();g.fillPath();g.lineStyle(3,0x87b5aa,.5);g.lineBetween(w*.2,0,w*.23,h);
+ // paths
+ g.lineStyle(Math.max(22,w*.025),0xb89b69,.85);g.beginPath();g.moveTo(w*.48,h*.52);g.lineTo(w*.52,h*.68);g.lineTo(w*.73,h*.78);g.strokePath();g.lineStyle(2,0xd8bd8a,.55);g.lineBetween(w*.49,h*.53,w*.73,h*.78);
+ // forest
+ const trees=[[.08,.2],[.12,.3],[.08,.4],[.31,.18],[.36,.25],[.82,.18],[.88,.27],[.9,.42],[.78,.36],[.83,.62],[.9,.68],[.31,.75],[.37,.82],[.08,.78]];trees.forEach(([x,y],i)=>this.drawTree(w*x,h*y,Math.max(14,Math.min(25,w/55))+(i%3)*2));
+ this.drawCastle(w*.49,h*.42,Math.max(.72,Math.min(1.15,w/1100)));
+ this.drawFarm(w*.69,h*.58,level,construction!==null);
+ this.drawMine(w*.78,h*.32);
+ // labels
+ this.label(w*.49,h*.60,'CASTILLO',`Nivel ${this.state.kingdomLevel}`);
+ this.label(w*.69,h*.72,level?'GRANJA':'SOLAR DE GRANJA',level?`Nivel ${level} · +${Math.floor(farm?.productionPerHour??0)}/h`:'Lista para construir');
+ if(IS_DEMO)this.add.text(w-10,10,'DEMO',{fontFamily:'system-ui',fontSize:'10px',color:'#ead59a',backgroundColor:'#20251dcc',padding:{x:7,y:4}}).setOrigin(1,0).setDepth(20);
+ // mission card
+ const panelW=Math.min(330,w*.42),panelH=86,px=14,py=h-panelH-14;g.fillStyle(0x171a15,.9).fillRoundedRect(px,py,panelW,panelH,10);g.lineStyle(1,0xb39250,.8).strokeRoundedRect(px,py,panelW,panelH,10);this.add.text(px+14,py+10,'PRIMEROS PASOS',{fontFamily:'system-ui',fontStyle:'bold',fontSize:'11px',color:'#d9b96b'});this.add.text(px+14,py+29,level===0?'Construye una granja':'Mejora tu granja',{fontFamily:'Georgia',fontStyle:'bold',fontSize:'18px',color:'#fff3ce'});this.add.text(px+14,py+55,construction?'Construcción en curso...':'Toca el edificio para continuar',{fontFamily:'system-ui',fontSize:'11px',color:'#b8bdad'});
+ // action
+ const bx=Math.min(w-82,w*.69),by=Math.min(h-62,h*.82);if(construction){const bg=this.add.rectangle(bx,by,210,48,0x2b2920,.95).setStrokeStyle(1,0xc59d52);this.add.text(bx,by,`⚒  Construyendo · ${this.formatTime(construction.remainingSeconds)}`,{fontFamily:'system-ui',fontSize:'13px',color:'#ffe8a8'}).setOrigin(.5);bg.setDepth(4)}else if(level<10){this.farmButton=this.actionButton(bx,by,level===0?'CONSTRUIR GRANJA':'MEJORAR GRANJA',level===0?'100 madera':`${Math.round(100*Math.pow(1.7,level))} madera`);this.farmButton.on('pointerdown',()=>void this.onUpgradeFarm())}
+ }
+ private drawTree(x:number,y:number,s:number){const g=this.add.graphics();g.fillStyle(0x49331f).fillRect(x-s*.12,y,s*.24,s*.7);g.fillStyle(0x294c2c).fillTriangle(x,y-s*.95,x-s*.58,y-s*.08,x+s*.58,y-s*.08);g.fillStyle(0x355e34).fillTriangle(x,y-s*.65,x-s*.72,y+s*.18,x+s*.72,y+s*.18);g.setDepth(y)}
+ private drawCastle(x:number,y:number,s:number){const g=this.add.graphics();g.fillStyle(0x39352f,.25).fillEllipse(x,y+70*s,210*s,55*s);g.fillStyle(0xb7aa8a).fillRect(x-78*s,y-28*s,156*s,100*s);g.fillStyle(0x8d826d).fillRect(x-100*s,y-60*s,45*s,132*s).fillRect(x+55*s,y-60*s,45*s,132*s).fillRect(x-30*s,y-86*s,60*s,158*s);g.fillStyle(0x5e4a37).fillTriangle(x-105*s,y-60*s,x-77*s,y-103*s,x-50*s,y-60*s).fillTriangle(x+50*s,y-60*s,x+77*s,y-103*s,x+105*s,y-60*s).fillTriangle(x-36*s,y-86*s,x,y-132*s,x+36*s,y-86*s);g.fillStyle(0x33281f).fillRoundedRect(x-16*s,y+25*s,32*s,47*s,5*s);g.fillStyle(0xe0b650).fillRect(x-4*s,y-125*s,5*s,36*s);g.fillStyle(0x9e3f31).fillTriangle(x+1*s,y-125*s,x+35*s,y-115*s,x+1*s,y-105*s);g.setDepth(y)}
+ private drawFarm(x:number,y:number,level:number,building:boolean){const g=this.add.graphics();g.fillStyle(0x57452c,.3).fillEllipse(x,y+35,150,45);if(level===0&&!building){g.lineStyle(3,0xd9bf78,.8);g.strokeRoundedRect(x-60,y-38,120,76,8);g.fillStyle(0xe7d078,.15).fillRoundedRect(x-60,y-38,120,76,8);this.add.text(x,y,'+', {fontFamily:'Georgia',fontSize:'42px',color:'#f4d981'}).setOrigin(.5).setDepth(y+2)}else{g.fillStyle(0xd7c39b).fillRect(x-48,y-20,96,60);g.fillStyle(0x744333).fillTriangle(x-60,y-20,x,y-66,x+60,y-20);g.fillStyle(0x583928).fillRect(x-13,y+5,26,35);for(let i=0;i<5;i++){g.lineStyle(3,0xc8a34f,.8);g.lineBetween(x-75+i*28,y+53,x-58+i*28,y+75)}if(building){this.add.text(x,y-82,'⚒',{fontSize:'26px'}).setOrigin(.5).setDepth(y+3)}}g.setDepth(y)}
+ private drawMine(x:number,y:number){const g=this.add.graphics();g.fillStyle(0x4c4b43).fillTriangle(x-75,y+40,x-15,y-55,x+35,y+40).fillTriangle(x-10,y+40,x+55,y-40,x+95,y+40);g.fillStyle(0x22231f).fillEllipse(x+8,y+15,45,55);g.setDepth(y)}
+ private label(x:number,y:number,title:string,sub:string){const t=this.add.text(x,y,`${title}\n${sub}`,{align:'center',fontFamily:'system-ui',fontStyle:'bold',fontSize:'11px',color:'#fff4cf',stroke:'#182014',strokeThickness:4,lineSpacing:2}).setOrigin(.5,0).setDepth(y+10);return t}
+ private actionButton(x:number,y:number,title:string,sub:string){const c=this.add.container(x,y).setDepth(40).setSize(210,58).setInteractive({useHandCursor:true});const bg=this.add.rectangle(0,0,210,58,0x80582c,.98).setStrokeStyle(2,0xd1a75c);const a=this.add.text(0,-9,title,{fontFamily:'system-ui',fontStyle:'bold',fontSize:'14px',color:'#fff4d0'}).setOrigin(.5);const b=this.add.text(0,12,sub,{fontFamily:'system-ui',fontSize:'10px',color:'#e0c58d'}).setOrigin(.5);c.add([bg,a,b]);return c}
+ private async onUpgradeFarm(){this.farmButton?.disableInteractive();try{this.state=await upgradeFarm();this.updateHud();this.renderScene()}catch(e){this.status?.setText(e instanceof Error?e.message:'No se pudo iniciar') }}
+ private formatTime(sec:number){const s=Math.max(0,sec),m=Math.floor(s/60);return`${String(m).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`}
 }
-
-function saveDemoState(state: KingdomState): void {
-  localStorage.setItem(DEMO_KEY, JSON.stringify(state));
-}
-
-function loadDemoState(): KingdomState {
-  const raw = localStorage.getItem(DEMO_KEY);
-  let state = raw ? JSON.parse(raw) as KingdomState : createDemoState();
-  const now = Date.now();
-
-  if (state.construction) {
-    const finish = new Date(state.construction.finishAt).getTime();
-    if (now >= finish) {
-      const farm = state.buildings.find((b) => b.code === 'FARM');
-      if (farm) {
-        farm.level = state.construction.toLevel;
-        farm.productionPerHour = farm.level === 1 ? 600 : Math.round(600 * Math.pow(1.45, farm.level - 1));
-      }
-      state.construction = null;
-    } else {
-      state.construction.remainingSeconds = Math.ceil((finish - now) / 1000);
-    }
-  }
-
-  const last = new Date(state.serverTime).getTime();
-  const farm = state.buildings.find((b) => b.code === 'FARM');
-  if (farm && farm.level > 0 && now > last) {
-    const elapsedHours = (now - last) / 3_600_000;
-    state.resources.FOOD = (state.resources.FOOD ?? 0) + farm.productionPerHour * elapsedHours;
-  }
-
-  state.serverTime = new Date(now).toISOString();
-  saveDemoState(state);
-  return state;
-}
-
-async function loadKingdom(): Promise<KingdomState> {
-  if (IS_DEMO) return loadDemoState();
-  const response = await fetch(`${API_BASE}/api/kingdom`);
-  if (!response.ok) throw new Error('No se pudo cargar el reino');
-  return response.json();
-}
-
-async function upgradeFarm(): Promise<KingdomState> {
-  if (IS_DEMO) {
-    const state = loadDemoState();
-    const farm = state.buildings.find((b) => b.code === 'FARM');
-    if (!farm || state.construction) return state;
-    const targetLevel = farm.level + 1;
-    const cost = targetLevel === 1 ? 100 : Math.round(100 * Math.pow(1.7, targetLevel - 1));
-    if ((state.resources.WOOD ?? 0) < cost) throw new Error('No tienes madera suficiente');
-    state.resources.WOOD -= cost;
-    const seconds = targetLevel === 1 ? 5 : Math.min(30, 5 * targetLevel);
-    const startedAt = new Date();
-    const finishAt = new Date(startedAt.getTime() + seconds * 1000);
-    state.construction = {
-      id: crypto.randomUUID(),
-      buildingCode: 'FARM',
-      fromLevel: farm.level,
-      toLevel: targetLevel,
-      startedAt: startedAt.toISOString(),
-      finishAt: finishAt.toISOString(),
-      remainingSeconds: seconds
-    };
-    saveDemoState(state);
-    return state;
-  }
-
-  const response = await fetch(`${API_BASE}/api/kingdom/farm/upgrade`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ requestId: crypto.randomUUID() })
-  });
-  if (!response.ok) {
-    const error = await response.json().catch(() => null);
-    throw new Error(error?.detail ?? 'No se pudo mejorar la granja');
-  }
-  return response.json();
-}
-
-class KingdomScene extends Phaser.Scene {
-  private state?: KingdomState;
-  private status?: Phaser.GameObjects.Text;
-  private farmButton?: Phaser.GameObjects.Text;
-
-  constructor() {
-    super('KingdomScene');
-  }
-
-  create(): void {
-    this.cameras.main.setBackgroundColor('#6e934f');
-    this.scale.on('resize', () => this.renderScene());
-    this.status = this.add.text(20, 20, 'Cargando reino...', {
-      fontFamily: 'system-ui, sans-serif', fontSize: '18px', color: '#ffffff',
-      backgroundColor: '#00000099', padding: { x: 12, y: 8 }
-    }).setDepth(20);
-    void this.refresh();
-    this.time.addEvent({ delay: 1000, loop: true, callback: () => void this.refresh(false) });
-  }
-
-  private async refresh(showError = true): Promise<void> {
-    try {
-      this.state = await loadKingdom();
-      this.status?.setText('');
-      this.renderScene();
-    } catch (error) {
-      if (showError) this.status?.setText(error instanceof Error ? error.message : 'Error cargando el reino');
-    }
-  }
-
-  private renderScene(): void {
-    if (!this.state) return;
-    const { width, height } = this.scale;
-    const farm = this.state.buildings.find((b) => b.code === 'FARM');
-    const construction = this.state.construction;
-
-    this.children.list.filter((child) => child !== this.status).forEach((child) => child.destroy());
-
-    this.add.text(width / 2, Math.max(48, height * 0.08), 'ETERNAL CROWN', {
-      fontFamily: 'Georgia, serif', fontSize: '26px', color: '#f7df9a', stroke: '#332719', strokeThickness: 6
-    }).setOrigin(0.5);
-
-    this.add.text(width / 2, Math.max(82, height * 0.125), this.state.kingdomName, {
-      fontFamily: 'Georgia, serif', fontSize: '19px', color: '#fff4d0', stroke: '#332719', strokeThickness: 4
-    }).setOrigin(0.5);
-
-    const r = this.state.resources;
-    this.add.text(width / 2, Math.max(118, height * 0.18),
-      `🌾 ${Math.floor(r.FOOD ?? 0)}   🪵 ${Math.floor(r.WOOD ?? 0)}   🪨 ${Math.floor(r.STONE ?? 0)}   🪙 ${Math.floor(r.GOLD ?? 0)}   💎 ${Math.floor(r.GEMS ?? 0)}`,
-      { fontFamily: 'system-ui, sans-serif', fontSize: '18px', color: '#ffffff', backgroundColor: '#00000088', padding: { x: 14, y: 8 } }
-    ).setOrigin(0.5);
-
-    if (IS_DEMO) {
-      this.add.text(width - 14, 14, 'DEMO GITHUB', {
-        fontFamily: 'system-ui, sans-serif', fontSize: '12px', color: '#fff4d0', backgroundColor: '#5d421dcc', padding: { x: 8, y: 5 }
-      }).setOrigin(1, 0);
-    }
-
-    this.add.text(width * 0.43, height * 0.46, '🏰', { fontSize: '108px' }).setOrigin(0.5);
-    this.add.text(width * 0.58, height * 0.53, '🌾', { fontSize: '78px' }).setOrigin(0.5);
-    this.add.text(width * 0.28, height * 0.57, '🌲', { fontSize: '54px' }).setOrigin(0.5);
-    this.add.text(width * 0.73, height * 0.44, '🌲', { fontSize: '48px' }).setOrigin(0.5);
-
-    const farmLevel = farm?.level ?? 0;
-    this.add.text(width * 0.58, height * 0.65,
-      farmLevel === 0 ? 'Granja sin construir' : `Granja · Nivel ${farmLevel}\n+${Math.floor(farm?.productionPerHour ?? 0)} alimentos/h`,
-      { align: 'center', fontFamily: 'system-ui, sans-serif', fontSize: '17px', color: '#ffffff', stroke: '#26351f', strokeThickness: 4 }
-    ).setOrigin(0.5);
-
-    if (construction?.buildingCode === 'FARM') {
-      this.add.text(width / 2, height * 0.77,
-        `🔨 Construyendo Granja nivel ${construction.toLevel} · ${this.formatTime(construction.remainingSeconds)}`,
-        { fontFamily: 'system-ui, sans-serif', fontSize: '18px', color: '#fff4d0', backgroundColor: '#332719dd', padding: { x: 16, y: 10 } }
-      ).setOrigin(0.5);
-    } else if (farmLevel < 10) {
-      this.farmButton = this.add.text(width / 2, height * 0.78,
-        farmLevel === 0 ? 'CONSTRUIR GRANJA' : 'MEJORAR GRANJA',
-        { fontFamily: 'system-ui, sans-serif', fontStyle: 'bold', fontSize: '19px', color: '#ffffff', backgroundColor: '#8a5a24', padding: { x: 22, y: 13 } }
-      ).setOrigin(0.5).setInteractive({ useHandCursor: true });
-      this.farmButton.on('pointerdown', () => void this.onUpgradeFarm());
-    }
-
-    this.add.text(width / 2, height * 0.9,
-      farmLevel === 0 ? '🎯 Objetivo: construye tu primera granja' : '🎯 Sigue desarrollando tu reino',
-      { fontFamily: 'system-ui, sans-serif', fontSize: '16px', color: '#ffffff', backgroundColor: '#00000077', padding: { x: 14, y: 9 } }
-    ).setOrigin(0.5);
-  }
-
-  private async onUpgradeFarm(): Promise<void> {
-    this.farmButton?.disableInteractive().setText('INICIANDO...');
-    try {
-      this.state = await upgradeFarm();
-      this.renderScene();
-    } catch (error) {
-      this.status?.setText(error instanceof Error ? error.message : 'No se pudo iniciar la construccion');
-      this.renderScene();
-    }
-  }
-
-  private formatTime(seconds: number): string {
-    const s = Math.max(0, seconds);
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
-    return [h, m, sec].map((n) => String(n).padStart(2, '0')).join(':');
-  }
-}
-
-const config: Phaser.Types.Core.GameConfig = {
-  type: Phaser.AUTO,
-  parent: 'game',
-  width: 1280,
-  height: 720,
-  backgroundColor: '#6e934f',
-  scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
-  scene: [KingdomScene]
-};
-
-new Phaser.Game(config);
+new Phaser.Game({type:Phaser.AUTO,parent:'game',width:1280,height:720,backgroundColor:'#607f45',scale:{mode:Phaser.Scale.RESIZE,autoCenter:Phaser.Scale.CENTER_BOTH},scene:[KingdomScene]});
