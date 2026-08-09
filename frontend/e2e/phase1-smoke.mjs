@@ -7,14 +7,14 @@ const page=await browser.newPage({viewport:{width:1366,height:900}});
 await page.goto(base,{waitUntil:'networkidle'});
 await page.evaluate(()=>localStorage.clear());
 await page.reload({waitUntil:'networkidle'});
-await page.waitForTimeout(1200);
+await page.waitForTimeout(900);
 await page.screenshot({path:`${out}/01-inicio.png`,fullPage:true});
 const canvas=page.locator('#game canvas');
 if(!(await canvas.isVisible()))throw Error('Canvas no visible');
-const clickCanvas=async(x,y)=>{const box=await canvas.boundingBox();if(!box)throw Error('Canvas sin dimensiones');await page.mouse.click(box.x+box.width*x,box.y+box.height*y);await page.waitForTimeout(250)};
+const clickCanvas=async(x,y)=>{const box=await canvas.boundingBox();if(!box)throw Error('Canvas sin dimensiones');await page.mouse.click(box.x+box.width*x,box.y+box.height*y);await page.waitForTimeout(300)};
 const state=()=>page.evaluate(k=>JSON.parse(localStorage.getItem(k)||'{}'),KEY);
-const finish=async()=>{await page.evaluate(k=>{const s=JSON.parse(localStorage.getItem(k)||'{}');if(s.construction)s.construction.finishAt=Date.now()-100;if(s.training)s.training.finishAt=Date.now()-100;localStorage.setItem(k,JSON.stringify(s))},KEY);await page.waitForTimeout(1400)};
-const build=async(code,x,y)=>{await clickCanvas(x,y);await clickCanvas(.72,.84);let s=await state();if(s.construction?.code!==code)throw Error(`No inicia ${code}`);await finish();s=await state();if((s.buildings?.[code]?.level||0)<1)throw Error(`No finaliza ${code}: ${JSON.stringify(s)}`)};
+const finish=async()=>{await page.evaluate(k=>{const s=JSON.parse(localStorage.getItem(k)||'{}');if(s.construction)s.construction.finishAt=0;if(s.training)s.training.finishAt=0;localStorage.setItem(k,JSON.stringify(s))},KEY);await page.reload({waitUntil:'networkidle'});await page.waitForTimeout(700)};
+const build=async(code,x,y)=>{await clickCanvas(x,y);await clickCanvas(.72,.84);let s=await state();if(s.construction?.code!==code)throw Error(`No inicia ${code}: ${JSON.stringify(s.construction)}`);await finish();s=await state();if((s.buildings?.[code]?.level||0)<1)throw Error(`No finaliza ${code}: ${JSON.stringify(s)}`)};
 await build('FARM',.70,.57);
 await page.screenshot({path:`${out}/02-granja.png`,fullPage:true});
 await build('SAWMILL',.31,.57);
@@ -26,7 +26,7 @@ await build('BARRACKS',.58,.69);
 await page.screenshot({path:`${out}/04-cuartel.png`,fullPage:true});
 await page.locator('#nav-army').click();
 await page.waitForTimeout(500);
-for(let i=0;i<3;i++){await clickCanvas(.68,.48);s=await state();if(!s.training)throw Error(`No inicia entrenamiento ${i+1}`);await finish()}
+for(let i=0;i<3;i++){await clickCanvas(.68,.48);s=await state();if(!s.training)throw Error(`No inicia entrenamiento ${i+1}`);await finish();await page.locator('#nav-army').click();await page.waitForTimeout(250)}
 s=await state();if(s.swordsmen!==3)throw Error(`Soldados incorrectos ${s.swordsmen}`);
 await page.screenshot({path:`${out}/05-ejercito.png`,fullPage:true});
 await page.locator('#nav-map').click();
