@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: eternal-crown
+  profiles:
+    default: local
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+
+server:
+  port: ${SERVER_PORT:8080}
+
+eternal:
+  game:
+    version: 0.1.0
