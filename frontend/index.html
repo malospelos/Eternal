@@ -3,17 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#17140f" />
+    <meta name="theme-color" content="#172016" />
     <title>Eternal Crown</title>
   </head>
   <body>
     <div id="app">
-      <header class="resource-bar" aria-label="Recursos del reino">
-        <span>🌾 1.250</span><span>🪵 800</span><span>🪨 500</span><span>🪙 620</span><span>💎 100</span>
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">♛</div>
+          <div><strong>ETERNAL CROWN</strong><small>Reino de Elyndor</small></div>
+        </div>
+        <div class="resources" aria-label="Recursos del reino">
+          <div><span class="resource-icon food">●</span><b id="res-food">500</b><small>Comida</small></div>
+          <div><span class="resource-icon wood">◆</span><b id="res-wood">500</b><small>Madera</small></div>
+          <div><span class="resource-icon stone">⬟</span><b id="res-stone">500</b><small>Piedra</small></div>
+          <div><span class="resource-icon gold">●</span><b id="res-gold">500</b><small>Oro</small></div>
+          <div><span class="resource-icon gems">♦</span><b id="res-gems">100</b><small>Cristales</small></div>
+        </div>
       </header>
+
       <main id="game"></main>
+
       <nav class="game-nav" aria-label="Navegación principal">
-        <button>🏰 Reino</button><button>⚔️ Ejército</button><button>🗺️ Mapa</button><button>🎯 Misiones</button>
+        <button class="active"><span>♜</span>Reino</button>
+        <button><span>⚔</span>Ejército</button>
+        <button><span>⌖</span>Mapa</button>
+        <button><span>★</span>Misiones</button>
       </nav>
     </div>
     <script type="module" src="/src/main.ts"></script>
