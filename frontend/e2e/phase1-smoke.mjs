@@ -1,38 +1,12 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
-
-const base = 'https://malospelos.github.io/Eternal/?ci=' + Date.now();
-const out = 'e2e-artifacts';
-await fs.mkdir(out, { recursive: true });
-
-const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1366, height: 900 }, deviceScaleFactor: 1 });
-await page.goto(base, { waitUntil: 'networkidle' });
-await page.evaluate(() => localStorage.clear());
-await page.reload({ waitUntil: 'networkidle' });
-await page.waitForTimeout(1500);
-await page.screenshot({ path: `${out}/01-inicio.png`, fullPage: true });
-
-const canvas = page.locator('#game canvas');
-if (!(await canvas.isVisible())) throw new Error('El canvas del juego no es visible');
-const box = await canvas.boundingBox();
-if (!box) throw new Error('No se pudo medir el canvas');
-
-await page.mouse.click(box.x + box.width * 0.68, box.y + box.height * 0.59);
-await page.waitForTimeout(250);
-await page.mouse.click(box.x + box.width * 0.70, box.y + box.height * 0.84);
-await page.waitForTimeout(750);
-const state1 = await page.evaluate(() => JSON.parse(localStorage.getItem('eternal-crown-demo-state-v2') || '{}'));
-if (!state1.construction || state1.construction.buildingCode !== 'FARM') throw new Error('No se inicio la construccion de la granja');
-await page.screenshot({ path: `${out}/02-granja-construyendo.png`, fullPage: true });
-
-await page.waitForTimeout(6000);
-await page.reload({ waitUntil: 'networkidle' });
-await page.waitForTimeout(1000);
-const state2 = await page.evaluate(() => JSON.parse(localStorage.getItem('eternal-crown-demo-state-v2') || '{}'));
-const farm = state2.buildings?.find((b) => b.code === 'FARM');
-if (!farm || farm.level < 1) throw new Error('La granja no termino correctamente');
-await page.screenshot({ path: `${out}/03-granja-finalizada.png`, fullPage: true });
-
-console.log('SMOKE_OK', JSON.stringify({ farmLevel: farm.level, food: state2.resources?.FOOD, wood: state2.resources?.WOOD }));
-await browser.close();
+const KEY='eternal-crown-phase1-v1',base='https://malospelos.github.io/Eternal/?ci='+Date.now(),out='e2e-artifacts';
+await fs.mkdir(out,{recursive:true});const browser=await chromium.launch();const page=await browser.newPage({viewport:{width:1366,height:900}});await page.goto(base,{waitUntil:'networkidle'});await page.evaluate(()=>localStorage.clear());await page.reload({waitUntil:'networkidle'});await page.waitForTimeout(900);await page.screenshot({path:`${out}/01-inicio.png`,fullPage:true});
+const canvas=page.locator('#game canvas');if(!(await canvas.isVisible()))throw Error('Canvas no visible');const box=await canvas.boundingBox();if(!box)throw Error('Canvas sin dimensiones');
+const clickCanvas=async(x,y)=>{await page.mouse.click(box.x+box.width*x,box.y+box.height*y);await page.waitForTimeout(180)};
+const state=()=>page.evaluate(k=>JSON.parse(localStorage.getItem(k)||'{}'),KEY);
+const finish=async()=>{await page.evaluate(k=>{const s=JSON.parse(localStorage.getItem(k));if(s?.construction)s.construction.finishAt=Date.now()-1;if(s?.training)s.training.finishAt=Date.now()-1;localStorage.setItem(k,JSON.stringify(s))},KEY);await page.waitForTimeout(700)};
+const build=async(code,x,y)=>{await clickCanvas(x,y);await clickCanvas(.72,.84);let s=await state();if(s.construction?.code!==code)throw Error(`No inicia ${code}`);await finish();s=await state();if(s.buildings?.[code]?.level<1)throw Error(`No finaliza ${code}`)};
+await build('FARM',.70,.57);await page.screenshot({path:`${out}/02-granja.png`,fullPage:true});await build('SAWMILL',.31,.57);await build('QUARRY',.81,.30);await page.screenshot({path:`${out}/03-economia.png`,fullPage:true});await build('HOUSE',.43,.70);let s=await state();if(s.populationCap!==10)throw Error('Vivienda no aumenta poblacion');await build('BARRACKS',.58,.69);await page.screenshot({path:`${out}/04-cuartel.png`,fullPage:true});
+await page.locator('#nav-army').click();await page.waitForTimeout(300);for(let i=0;i<3;i++){await clickCanvas(.68,.48);s=await state();if(!s.training)throw Error('No inicia entrenamiento');await finish()}s=await state();if(s.swordsmen!==3)throw Error(`Soldados incorrectos ${s.swordsmen}`);await page.screenshot({path:`${out}/05-ejercito.png`,fullPage:true});
+await page.locator('#nav-map').click();await page.waitForTimeout(300);await clickCanvas(.72,.72);s=await state();if(!s.battle?.won||!s.phaseComplete)throw Error('El combate final no completa Fase 1');await page.screenshot({path:`${out}/06-victoria-fase1.png`,fullPage:true});console.log('PHASE1_OK',JSON.stringify({buildings:s.buildings,population:`${s.population}/${s.populationCap}`,swordsmen:s.swordsmen,battle:s.battle,resources:s.resources}));await browser.close();
