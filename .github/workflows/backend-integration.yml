@@ -2,6 +2,16 @@ name: Backend integration
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - 'sql/**'
+      - '.github/workflows/backend-integration.yml'
+
+concurrency:
+  group: eternal-backend-integration
+  cancel-in-progress: false
 
 jobs:
   integration:
@@ -16,10 +26,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -104,7 +114,7 @@ jobs:
 
       - name: Validar trazabilidad SQL
         run: |
-          /opt/mssql-tools18/bin/sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASSWORD" -C -b -Q "SET NOCOUNT ON; DECLARE @K BIGINT=(SELECT k.Id FROM dbo.ec_kingdoms k JOIN dbo.ec_players p ON p.Id=k.PlayerId WHERE p.PlayerName=N'Comandante'); IF (SELECT COUNT(*) FROM dbo.ec_resource_transactions WHERE KingdomId=@K AND ResourceCode='WOOD' AND ReasonCode='BUILDING_UPGRADE' AND Amount=-100)<>1 THROW 51000,'Movimiento de madera incorrecto',1; IF NOT EXISTS(SELECT 1 FROM dbo.ec_resource_transactions WHERE KingdomId=@K AND ResourceCode='FOOD' AND ReasonCode='OFFLINE_PRODUCTION' AND Amount>0) THROW 51000,'Falta movimiento de produccion',1; SELECT 'BACKEND INTEGRATION OK' Result;"
+          /opt/mssql-tools18/bin/sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASSWORD" -C -b -Q "SET ANSI_NULLS ON; SET ANSI_WARNINGS ON; SET ARITHABORT ON; SET CONCAT_NULL_YIELDS_NULL ON; SET QUOTED_IDENTIFIER ON; SET NUMERIC_ROUNDABORT OFF; SET NOCOUNT ON; DECLARE @K BIGINT=(SELECT k.Id FROM dbo.ec_kingdoms k JOIN dbo.ec_players p ON p.Id=k.PlayerId WHERE p.PlayerName=N'Comandante'); IF (SELECT COUNT(*) FROM dbo.ec_resource_transactions WHERE KingdomId=@K AND ResourceCode='WOOD' AND ReasonCode='BUILDING_UPGRADE' AND Amount=-100)<>1 THROW 51000,'Movimiento de madera incorrecto',1; IF NOT EXISTS(SELECT 1 FROM dbo.ec_resource_transactions WHERE KingdomId=@K AND ResourceCode='FOOD' AND ReasonCode='OFFLINE_PRODUCTION' AND Amount>0) THROW 51000,'Falta movimiento de produccion',1; SELECT 'BACKEND INTEGRATION OK' Result;"
 
       - name: Mostrar log si falla
         if: failure()
