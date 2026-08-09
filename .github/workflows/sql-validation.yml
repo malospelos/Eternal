@@ -1,0 +1,59 @@
+name: SQL validation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  validate-sql:
+    name: Validar SQL Server
+    runs-on: ubuntu-latest
+    environment: eternal-sql
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar sqlcmd
+        run: |
+          curl https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
+          curl https://packages.microsoft.com/config/ubuntu/24.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18
+
+      - name: Comprobar secretos requeridos
+        env:
+          DB_SERVER: ${{ secrets.ETERNAL_DB_SERVER }}
+          DB_NAME: ${{ secrets.ETERNAL_DB_NAME }}
+          DB_USER: ${{ secrets.ETERNAL_DB_USER }}
+          DB_PASSWORD: ${{ secrets.ETERNAL_DB_PASSWORD }}
+        run: |
+          test -n "$DB_SERVER"
+          test -n "$DB_NAME"
+          test -n "$DB_USER"
+          test -n "$DB_PASSWORD"
+
+      - name: Probar conexion
+        env:
+          DB_SERVER: ${{ secrets.ETERNAL_DB_SERVER }}
+          DB_NAME: ${{ secrets.ETERNAL_DB_NAME }}
+          DB_USER: ${{ secrets.ETERNAL_DB_USER }}
+          DB_PASSWORD: ${{ secrets.ETERNAL_DB_PASSWORD }}
+        run: |
+          /opt/mssql-tools18/bin/sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASSWORD" -C -b -Q "SET NOCOUNT ON; SELECT DB_NAME() AS DatabaseName;"
+
+      - name: Ejecutar esquema MVP
+        env:
+          DB_SERVER: ${{ secrets.ETERNAL_DB_SERVER }}
+          DB_NAME: ${{ secrets.ETERNAL_DB_NAME }}
+          DB_USER: ${{ secrets.ETERNAL_DB_USER }}
+          DB_PASSWORD: ${{ secrets.ETERNAL_DB_PASSWORD }}
+        run: |
+          /opt/mssql-tools18/bin/sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASSWORD" -C -b -i sql/001_mvp_reino_recursos_granja.sql
+
+      - name: Smoke test de tablas
+        env:
+          DB_SERVER: ${{ secrets.ETERNAL_DB_SERVER }}
+          DB_NAME: ${{ secrets.ETERNAL_DB_NAME }}
+          DB_USER: ${{ secrets.ETERNAL_DB_USER }}
+          DB_PASSWORD: ${{ secrets.ETERNAL_DB_PASSWORD }}
+        run: |
+          /opt/mssql-tools18/bin/sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASSWORD" -C -b -Q "SET NOCOUNT ON; IF OBJECT_ID('dbo.ec_kingdoms','U') IS NULL THROW 51000, 'Falta ec_kingdoms', 1; IF OBJECT_ID('dbo.ec_kingdom_resources','U') IS NULL THROW 51000, 'Falta ec_kingdom_resources', 1; IF OBJECT_ID('dbo.ec_construction_queue','U') IS NULL THROW 51000, 'Falta ec_construction_queue', 1; SELECT 'SQL MVP OK' AS Result;"
