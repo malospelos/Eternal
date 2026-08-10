@@ -15,7 +15,7 @@ jobs:
         with: { distribution: temurin, java-version: '17' }
       - run: mvn -B test
   frontend:
-    name: Frontend UI + Fase VI
+    name: Frontend UI + Fase VII
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: frontend } }
     steps:
@@ -27,8 +27,8 @@ jobs:
       - run: npm run build
       - run: npm run preview -- --host 127.0.0.1 > /tmp/eternal-vite.log 2>&1 &
       - run: for i in {1..30}; do curl -fsS http://127.0.0.1:4173/Eternal/ >/dev/null && exit 0; sleep 1; done; exit 1
-      - name: Jugar Fase VI completa
-        run: npm run test:phase6
+      - name: Jugar Fase VII completa
+        run: npm run test:phase7
       - if: always()
         uses: actions/upload-artifact@v4
-        with: { name: eternal-fase-vi-captura, path: frontend/phase6-complete.png, if-no-files-found: error }
+        with: { name: eternal-fase-vii-captura, path: frontend/phase7-complete.png, if-no-files-found: error }
