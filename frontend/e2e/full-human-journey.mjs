@@ -1,0 +1,16 @@
+import{chromium}from'playwright';import fs from'node:fs';const b=await chromium.launch({headless:true});const p=await b.newPage({viewport:{width:1440,height:1000}});const base=process.env.BASE_URL||'http://127.0.0.1:4173/Eternal/';const shot=async n=>{fs.mkdirSync('e2e-artifacts/human',{recursive:true});await p.screenshot({path:`e2e-artifacts/human/${n}.png`,fullPage:true})};try{await p.goto(base,{waitUntil:'networkidle'});await p.evaluate(()=>localStorage.clear());await p.reload({waitUntil:'networkidle'});await p.getByText('ELYNDOR 1.1').waitFor();await shot('00-inicio');
+// Fase I: solo controles visibles de usuario
+await p.click('#scout');await p.click('#train');await p.click('#attack');await p.click('#research');await p.waitForSelector('text=FASE I COMPLETADA');await shot('01-fase1');
+// Fase II
+await p.click('#collect');await p.click('#kingdom-toggle');for(const code of ['FARM','WAREHOUSE','HOUSE']){await p.click(`[data-upgrade="${code}"]`);await p.click('#finish-builds')}await p.waitForSelector('text=FASE II COMPLETADA');await shot('02-fase2');
+// Fase III
+await p.click('#conquest-toggle');for(const id of ['forest','ruins','watch']){await p.click(`[data-province="${id}"]`);await p.click('#phase3-scout');await p.click('#phase3-resolve');await p.click(`[data-province="${id}"]`);await p.click('#phase3-attack');await p.click('#phase3-resolve')}await p.waitForSelector('text=FASE III COMPLETADA');await shot('03-fase3');
+// Fase IV
+await p.click('#phase4-toggle');await p.click('#gain-xp');for(const s of ['Inspiración real','Carga del guardián'])await p.click(`[data-skill="${s}"]`);await p.click('[data-tab="RESEARCH"]');for(const id of ['steel','formation','logistics','guilds','runes','crown']){const x=p.locator(`[data-research="${id}"]`);if(await x.isEnabled())await x.click()}await p.waitForSelector('text=FASE IV COMPLETADA');await shot('04-fase4');
+// Fase V
+await p.click('.p5-toggle');for(const f of ['LINE','PHALANX','WEDGE']){await p.click(`[data-form="${f}"]`);await p.click('#p5-fight')}await p.waitForSelector('text=FASE V COMPLETADA');await shot('05-fase5');
+// Fase VI
+await p.click('.p6-toggle');for(let i=0;i<3;i++)await p.click('[data-choice="WISDOM"]');await p.waitForSelector('text=FASE VI COMPLETADA');await shot('06-fase6');
+// Fase VII
+await p.click('.p7-toggle');await p.click('[data-act="treaty"][data-i="0"]');await p.click('[data-act="trade"][data-i="2"]');await p.click('[data-act="war"][data-i="1"]');await p.waitForSelector('text=FASE VII COMPLETADA');await shot('07-final');
+console.log('HUMAN JOURNEY OK: fases I-VII completables exclusivamente mediante controles visibles.');}finally{await b.close()}
