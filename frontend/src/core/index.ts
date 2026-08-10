@@ -9,3 +9,4 @@ export * from './Pathfinder';
 export * from './MarchManager';
 export * from './EternalSimulation';
 export * from './Progression';
+export * from './Campaign';
