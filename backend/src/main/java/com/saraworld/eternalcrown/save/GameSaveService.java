@@ -2,24 +2,20 @@ package com.saraworld.eternalcrown.save;
 
 import org.springframework.stereotype.Service;
 import java.time.Instant;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class GameSaveService {
-    private final Map<String, GameSave> saves = new ConcurrentHashMap<>();
+    private final GameSaveRepository repository;
+    public GameSaveService(GameSaveRepository repository){this.repository=repository;}
 
-    public GameSave load(String playerId) {
-        return saves.computeIfAbsent(playerId, id -> new GameSave(id, "{}", 0L, Instant.now()));
+    public GameSave load(String playerId){return toSave(repository.find(playerId).orElseGet(()->repository.insertIfMissing(playerId)));}
+
+    public GameSave save(String playerId,String state,long expectedVersion){
+        if(state==null||state.isBlank())throw new IllegalArgumentException("EMPTY_STATE");
+        var updated=repository.updateIfVersion(playerId,state,expectedVersion,Instant.now());
+        if(updated.isEmpty())throw new IllegalStateException("VERSION_CONFLICT");
+        return toSave(updated.get());
     }
-
-    public synchronized GameSave save(String playerId, String state, long expectedVersion) {
-        GameSave current = load(playerId);
-        if (current.version() != expectedVersion) throw new IllegalStateException("VERSION_CONFLICT");
-        GameSave next = new GameSave(playerId, state, current.version() + 1, Instant.now());
-        saves.put(playerId, next);
-        return next;
-    }
-
-    public record GameSave(String playerId, String state, long version, Instant updatedAt) {}
+    private GameSave toSave(GameSaveRepository.GameSaveRecord r){return new GameSave(r.playerId(),r.state(),r.version(),r.updatedAt());}
+    public record GameSave(String playerId,String state,long version,Instant updatedAt){}
 }
