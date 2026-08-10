@@ -12,3 +12,5 @@ export * from './Progression';
 export * from './Campaign';
 export * from './Kingdom';
 export * from './Conquest';
+export * from './HeroProgression';
+export * from './ResearchTree';
