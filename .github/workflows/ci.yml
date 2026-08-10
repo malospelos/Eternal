@@ -1,58 +1,38 @@
 name: CI
-
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-
 jobs:
   backend:
     name: Backend Java
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
+    defaults: { run: { working-directory: backend } }
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-      - name: Java 17
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: '17' }
       - name: Compilar y probar backend
         run: mvn -B test
-
   frontend:
-    name: Frontend UI + Fase I
+    name: Frontend UI + Fase II
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
+    defaults: { run: { working-directory: frontend } }
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-      - name: Node 22
-        uses: actions/setup-node@v5
-        with:
-          node-version: '22'
-      - name: Instalar dependencias
-        run: npm install
-      - name: Instalar Chromium
-        run: npx playwright install --with-deps chromium
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: '22' }
+      - run: npm install
+      - run: npx playwright install --with-deps chromium
       - name: Compilar frontend
         run: npm run build
-      - name: Arrancar preview
-        run: npm run preview -- --host 127.0.0.1 > /tmp/eternal-vite.log 2>&1 &
-      - name: Esperar preview
-        run: for i in {1..30}; do curl -fsS http://127.0.0.1:4173/Eternal/ >/dev/null && exit 0; sleep 1; done; cat /tmp/eternal-vite.log; exit 1
-      - name: Jugar Fase I completa
-        run: npm run test:phase
-      - name: Guardar captura de prueba
+      - name: Jugar Fase II completa
+        run: npm run test:phase2
+      - name: Guardar captura Fase II
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: eternal-fase-i-captura
-          path: frontend/e2e/phase-elyndor-complete.png
+          name: eternal-fase-ii-captura
+          path: frontend/e2e-artifacts/phase2-complete.png
           if-no-files-found: ignore
