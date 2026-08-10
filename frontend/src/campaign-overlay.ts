@@ -1,0 +1,10 @@
+import './campaign-overlay.css';
+import { Campaign } from './core';
+const KEY='eternal.campaign.v04';
+const campaign=new Campaign();
+try{campaign.import(JSON.parse(localStorage.getItem(KEY)??'[]'))}catch{}
+const save=()=>localStorage.setItem(KEY,JSON.stringify(campaign.export()));
+function render(){document.querySelector('#campaign-panel')?.remove();const root=document.createElement('section');root.id='campaign-panel';const nodes=campaign.nodes();root.innerHTML=`<button id="campaign-toggle"><span>CAMPAÑA</span><b>${campaign.progress()}%</b></button><div class="campaign-drawer"><header><small>FASE I · EL DESPERTAR</small><b>La Sombra sobre Elyndor</b><span>${campaign.isComplete()?'FASE COMPLETADA':'Campaña en curso'}</span></header><div class="campaign-line">${nodes.map((n,i)=>`<article class="${n.status.toLowerCase()}"><i>${n.kind==='SCOUT'?'◉':n.kind==='BUILD'?'⚔':n.kind==='BATTLE'?'♜':'✦'}</i><div><small>CAPÍTULO ${i+1}</small><b>${n.title}</b><p>${n.description}</p><em>${n.reward}</em></div><strong>${n.status==='COMPLETED'?'✓':n.status==='AVAILABLE'?'ACTIVO':'🔒'}</strong></article>`).join('')}</div>${campaign.isComplete()?'<div class="phase-complete"><b>♛ FASE I COMPLETADA</b><p>Elyndor ha sobrevivido a su primer desafío. La frontera queda abierta para la siguiente campaña.</p></div>':''}</div>`;document.body.appendChild(root);root.querySelector('#campaign-toggle')?.addEventListener('click',()=>root.classList.toggle('open'))}
+function complete(id:string){if(campaign.complete(id)){save();render();document.querySelector('#campaign-panel')?.classList.add('open')}}
+document.addEventListener('click',e=>{const b=(e.target as HTMLElement).closest('button');if(!b)return;if(b.id==='scout')setTimeout(()=>complete('scout'),20);else if(b.id==='train')setTimeout(()=>complete('army'),20);else if(b.id==='attack')setTimeout(()=>complete('shadow'),20);else if(b.id==='research')setTimeout(()=>complete('wisdom'),20)});
+render();

@@ -1,13 +1,14 @@
 {
   "name": "eternal-crown-frontend",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test:e2e": "node e2e/phase1-smoke.mjs"
+    "test:e2e": "node e2e/phase1-smoke.mjs",
+    "test:phase": "node e2e/phase-elyndor-complete.mjs"
   },
   "dependencies": {
     "phaser": "^3.90.0"
