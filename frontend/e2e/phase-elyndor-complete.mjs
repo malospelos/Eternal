@@ -6,5 +6,5 @@ const action=async id=>{await page.evaluate(x=>{const b=document.createElement('
 try{
  await page.goto(base,{waitUntil:'networkidle'});await page.evaluate(()=>{localStorage.removeItem('eternal.campaign.v04');localStorage.removeItem('eternal.progression.v03')});await page.reload({waitUntil:'networkidle'});await page.getByText('ELYNDOR 0.4').waitFor();
  for(const id of ['scout','train','attack','research'])await action(id);
- const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('eternal.campaign.v04')||'[]'));assert.deepEqual(new Set(stored),new Set(['scout','army','shadow','wisdom']));await page.evaluate(()=>document.getElementById('campaign-toggle')?.click());await page.getByText('FASE I COMPLETADA').waitFor();await page.screenshot({path:'e2e/phase-elyndor-complete.png',fullPage:true});console.log('OK Fase I completa: cuatro capítulos, persistencia y final de campaña.');
+ const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('eternal.campaign.v04')||'[]'));assert.deepEqual(new Set(stored),new Set(['scout','army','shadow','wisdom']));await page.getByText('FASE I COMPLETADA').waitFor();await page.screenshot({path:'e2e/phase-elyndor-complete.png',fullPage:true});console.log('OK Fase I completa: cuatro capítulos, persistencia, final visible y captura.');
 }finally{await browser.close();}
